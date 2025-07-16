@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Visualisasi Sentimen</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .fade-in { animation: fadeIn 1s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body class="bg-light fade-in">
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="/">Sentimen Otomata</a>
+    <div>
+      <a class="btn btn-outline-light me-2" href="/visualisasi">Visualisasi</a>
+      <a class="btn btn-outline-light me-2" href="/wordcloud">WordCloud</a>
+      <a class="btn btn-outline-light me-2" href="/data">Tabel Data</a>
+      <a class="btn btn-outline-light" href="/tentang">Tentang</a>
+    </div>
+  </div>
+</nav>
+<div class="container">
+    <h1 class="mb-4"><span class="me-2">📉</span>Visualisasi Sentimen</h1>
+    <form method="get" class="mb-3">
+        <div class="row g-2 align-items-center">
+            <div class="col-auto fw-bold">Filter Sentimen:</div>
+            <div class="col-auto">
+                <select name="sentimen" class="form-select" onchange="this.form.submit()">
+                    <option value="" {% if not selected_sentimen %}selected{% endif %}>Semua</option>
+                    {% for s in all_sentiments %}
+                    <option value="{{ s }}" {% if selected_sentimen == s %}selected{% endif %}>{{ s|capitalize }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </form>
+    <div class="alert alert-primary fade-in mb-3" style="font-size:1.05rem">
+        <b>Grafik interaktif distribusi sentimen.</b> Arahkan mouse ke grafik untuk detail.
+    </div>
+    <div class="row mb-3">
+        <div class="col-md-3">
+            <div class="card text-center p-3 shadow-sm mb-2">
+                <div class="fw-bold">Rata-rata</div>
+                {% set n = chart_data['values']|length %}
+                <div class="display-6">
+                    {% if n > 0 %}
+                        {{ chart_data['values']|sum // n }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center p-3 shadow-sm mb-2">
+                <div class="fw-bold">Median</div>
+                <div class="display-6">
+                    {% if n > 0 %}
+                        {% set sorted = chart_data['values']|sort %}
+                        {% if n % 2 == 1 %}
+                            {{ sorted[n//2] }}
+                        {% else %}
+                            {{ ((sorted[(n//2)-1] + sorted[n//2]) // 2) if n > 1 else sorted[0] }}
+                        {% endif %}
+                    {% else %}
+                        -
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center p-3 shadow-sm mb-2">
+                <div class="fw-bold">Min</div>
+                <div class="display-6">
+                    {% if n > 0 %}
+                        {{ chart_data['values']|min }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center p-3 shadow-sm mb-2">
+                <div class="fw-bold">Max</div>
+                <div class="display-6">
+                    {% if n > 0 %}
+                        {{ chart_data['values']|max }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row mb-4">
+        <div class="col-md-6 mb-3">
+            <div class="card p-4 shadow-sm animate__animated animate__fadeInUp">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="fw-bold">Bar Chart Sentimen</span>
+                    <button class="btn btn-outline-primary btn-sm" onclick="downloadChart('sentimentChart', 'barchart_sentimen.png')">⬇️ Download</button>
+                </div>
+                <canvas id="sentimentChart" width="600" height="350" style="border-radius:1rem;box-shadow:0 2px 12px rgba(44,62,80,0.10);"></canvas>
+            </div>
+        </div>
+        <div class="col-md-6 mb-3">
+            <div class="card p-4 shadow-sm animate__animated animate__fadeInUp">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="fw-bold">Pie Chart Sentimen</span>
+                    <button class="btn btn-outline-primary btn-sm" onclick="downloadChart('pieChart', 'piechart_sentimen.png')">⬇️ Download</button>
+                </div>
+                <canvas id="pieChart" width="600" height="350" style="border-radius:1rem;box-shadow:0 2px 12px rgba(44,62,80,0.10);"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card p-4 shadow-sm animate__animated animate__fadeInUp">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="fw-bold">Line Chart Tren Sentimen per Bulan</span>
+                </div>
+                <canvas id="lineChart" width="900" height="350" style="border-radius:1rem;box-shadow:0 2px 12px rgba(44,62,80,0.10);"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card p-4 shadow-sm animate__animated animate__fadeInUp">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="fw-bold">Perbandingan Model (Akurasi, Precision, Recall)</span>
+                </div>
+                <canvas id="modelChart" width="900" height="350" style="border-radius:1rem;box-shadow:0 2px 12px rgba(44,62,80,0.10);"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card p-4 shadow-sm animate__animated animate__fadeInUp">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="fw-bold">Confusion Matrix (Dummy)</span>
+                </div>
+                <canvas id="cmChart" width="400" height="400" style="border-radius:1rem;box-shadow:0 2px 12px rgba(44,62,80,0.10);"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card p-4 shadow-sm animate__animated animate__fadeInUp">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="fw-bold">Heatmap Korelasi (Dummy)</span>
+                </div>
+                <canvas id="heatmapChart" width="400" height="400" style="border-radius:1rem;box-shadow:0 2px 12px rgba(44,62,80,0.10);"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card p-4 shadow-sm animate__animated animate__fadeInUp">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="fw-bold">Scatter Plot (Dummy)</span>
+                </div>
+                <canvas id="scatterChart" width="600" height="350" style="border-radius:1rem;box-shadow:0 2px 12px rgba(44,62,80,0.10);"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="alert alert-info fade-in mb-3" style="font-size:1.05rem">
+        <b>Insight:</b>
+        {% set max_sent = chart_data['values']|max %}
+        {% set min_sent = chart_data['values']|min %}
+        Sentimen terbanyak: <b>{{ chart_data['labels'][chart_data['values'].index(max_sent)]|capitalize }} ({{ max_sent }})</b> |
+        Sentimen paling sedikit: <b>{{ chart_data['labels'][chart_data['values'].index(min_sent)]|capitalize }} ({{ min_sent }})</b>
+    </div>
+    <a class="btn btn-secondary" href="/">⬅️ Kembali ke Dashboard</a>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-matrix@4.1.0/dist/chartjs-chart-matrix.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.umd.min.js"></script>
+<script>
+    const chartData = {{ chart_data|tojson|safe }};
+    const barColors = ['#6c63ff', '#00b894', '#fdcb6e'];
+    // Bar Chart
+    const ctx = document.getElementById('sentimentChart').getContext('2d');
+    const barChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: chartData.labels,
+            datasets: [{
+                label: 'Jumlah Sentimen',
+                data: chartData.values,
+                backgroundColor: barColors,
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => `Jumlah: ${ctx.parsed.y}`
+                    }
+                },
+                title: { display: true, text: 'Distribusi Sentimen' }
+            }
+        }
+    });
+    // Pie Chart
+    const ctxPie = document.getElementById('pieChart').getContext('2d');
+    const pieChart = new Chart(ctxPie, {
+        type: 'pie',
+        data: {
+            labels: chartData.labels,
+            datasets: [{
+                label: 'Proporsi Sentimen',
+                data: chartData.values,
+                backgroundColor: barColors,
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { display: true, position: 'bottom' },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => `${ctx.label}: ${ctx.parsed} (${((ctx.parsed/chartData.values.reduce((a,b)=>a+b,0))*100).toFixed(1)}%)`
+                    }
+                },
+                title: { display: true, text: 'Proporsi Sentimen' }
+            }
+        }
+    });
+    // Line Chart
+    const lineLabels = {{ line_labels|tojson|safe }};
+    const lineData = {{ line_data|tojson|safe }};
+    const ctxLine = document.getElementById('lineChart').getContext('2d');
+    const lineChart = new Chart(ctxLine, {
+        type: 'line',
+        data: {
+            labels: lineLabels,
+            datasets: [
+                {
+                    label: 'Positive',
+                    data: lineData.positive,
+                    borderColor: '#00b894',
+                    backgroundColor: 'rgba(0,184,148,0.1)',
+                    fill: true,
+                    tension: 0.3
+                },
+                {
+                    label: 'Neutral',
+                    data: lineData.neutral,
+                    borderColor: '#fdcb6e',
+                    backgroundColor: 'rgba(253,203,110,0.1)',
+                    fill: true,
+                    tension: 0.3
+                },
+                {
+                    label: 'Negative',
+                    data: lineData.negative,
+                    borderColor: '#e17055',
+                    backgroundColor: 'rgba(225,112,85,0.1)',
+                    fill: true,
+                    tension: 0.3
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { display: true, position: 'bottom' },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}`
+                    }
+                },
+                title: { display: true, text: 'Tren Sentimen per Bulan' }
+            },
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+    // Model Comparison Chart
+    const modelLabels = {{ model_labels|tojson|safe }};
+    const modelMetrics = {{ model_metrics|tojson|safe }};
+    const ctxModel = document.getElementById('modelChart').getContext('2d');
+    const modelChart = new Chart(ctxModel, {
+        type: 'bar',
+        data: {
+            labels: modelLabels,
+            datasets: [
+                {
+                    label: 'Akurasi',
+                    data: modelMetrics.Akurasi,
+                    backgroundColor: '#6c63ff'
+                },
+                {
+                    label: 'Precision',
+                    data: modelMetrics.Precision,
+                    backgroundColor: '#00b894'
+                },
+                {
+                    label: 'Recall',
+                    data: modelMetrics.Recall,
+                    backgroundColor: '#fdcb6e'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { display: true, position: 'bottom' },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => `${ctx.dataset.label}: ${(ctx.parsed.y*100).toFixed(1)}%`
+                    }
+                },
+                title: { display: true, text: 'Perbandingan Akurasi, Precision, Recall Model' }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 1,
+                    ticks: {
+                        callback: function(value) { return (value*100).toFixed(0) + '%'; }
+                    }
+                }
+            }
+        }
+    });
+    // Confusion Matrix Chart
+    const cmLabels = {{ cm_labels|tojson|safe }};
+    const cmMatrix = {{ cm_matrix|tojson|safe }};
+    const cmData = [];
+    const cmMax = Math.max(...cmMatrix.flat());
+    function getCMColor(val, max) {
+        const alpha = 0.2 + 0.8 * (val / max);
+        return `rgba(44,62,80,${alpha})`;
+    }
+    for(let row=0; row<cmLabels.length; row++) {
+        for(let col=0; col<cmLabels.length; col++) {
+            cmData.push({
+                x: col,
+                y: row,
+                v: cmMatrix[row][col],
+                backgroundColor: getCMColor(cmMatrix[row][col], cmMax)
+            });
+        }
+    }
+    new Chart(document.getElementById('cmChart').getContext('2d'), {
+        type: 'matrix',
+        data: {
+            datasets: [{
+                label: 'Confusion Matrix',
+                data: cmData,
+                width: ({chart}) => (chart.chartArea || {}).width / cmLabels.length - 8,
+                height: ({chart}) => (chart.chartArea || {}).height / cmLabels.length - 8,
+                backgroundColor: ctx => ctx.raw.backgroundColor,
+                borderWidth: 1,
+                borderColor: '#fff',
+                hoverBackgroundColor: '#0984e3',
+                hoverBorderColor: '#636e72',
+            }]
+        },
+        options: {
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        title: ctx => `Asli: ${cmLabels[ctx[0].raw.y]}, Prediksi: ${cmLabels[ctx[0].raw.x]}`,
+                        label: ctx => `Jumlah: ${ctx.raw.v}`
+                    }
+                },
+                title: { display: true, text: 'Confusion Matrix (Dummy)' }
+            },
+            scales: {
+                x: {
+                    type: 'category',
+                    labels: cmLabels,
+                    title: { display: true, text: 'Prediksi', font: { weight: 'bold' } },
+                    offset: true,
+                    grid: { display: false }
+                },
+                y: {
+                    type: 'category',
+                    labels: cmLabels,
+                    title: { display: true, text: 'Label Asli', font: { weight: 'bold' } },
+                    offset: true,
+                    reverse: true,
+                    grid: { display: false }
+                }
+            }
+        }
+    });
+    // Heatmap Chart
+    const heatmapLabels = {{ heatmap_labels|tojson|safe }};
+    const heatmapMatrix = {{ heatmap_matrix|tojson|safe }};
+    const heatmapData = [];
+    const heatmapMax = 1.0;
+    function getHeatmapColor(val) {
+        // Biru ke merah
+        const r = val > 0 ? Math.round(255 * val) : 0;
+        const b = val < 0 ? Math.round(255 * -val) : 0;
+        return `rgba(${r},0,${b},${0.3 + 0.7 * Math.abs(val)})`;
+    }
+    for(let row=0; row<heatmapLabels.length; row++) {
+        for(let col=0; col<heatmapLabels.length; col++) {
+            heatmapData.push({
+                x: col,
+                y: row,
+                v: heatmapMatrix[row][col],
+                backgroundColor: getHeatmapColor(heatmapMatrix[row][col])
+            });
+        }
+    }
+    new Chart(document.getElementById('heatmapChart').getContext('2d'), {
+        type: 'matrix',
+        data: {
+            datasets: [{
+                label: 'Heatmap Korelasi',
+                data: heatmapData,
+                width: ({chart}) => (chart.chartArea || {}).width / heatmapLabels.length - 8,
+                height: ({chart}) => (chart.chartArea || {}).height / heatmapLabels.length - 8,
+                backgroundColor: ctx => ctx.raw.backgroundColor,
+                borderWidth: 1,
+                borderColor: '#fff',
+                hoverBackgroundColor: '#0984e3',
+                hoverBorderColor: '#636e72',
+            }]
+        },
+        options: {
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        title: ctx => `Fitur Y: ${heatmapLabels[ctx[0].raw.y]}, Fitur X: ${heatmapLabels[ctx[0].raw.x]}`,
+                        label: ctx => `Korelasi: ${ctx.raw.v}`
+                    }
+                },
+                title: { display: true, text: 'Heatmap Korelasi (Dummy)' }
+            },
+            scales: {
+                x: {
+                    type: 'category',
+                    labels: heatmapLabels,
+                    title: { display: true, text: 'Fitur X', font: { weight: 'bold' } },
+                    offset: true,
+                    grid: { display: false }
+                },
+                y: {
+                    type: 'category',
+                    labels: heatmapLabels,
+                    title: { display: true, text: 'Fitur Y', font: { weight: 'bold' } },
+                    offset: true,
+                    reverse: true,
+                    grid: { display: false }
+                }
+            }
+        }
+    });
+    // Scatter Plot
+    const scatterData = {{ scatter_data|tojson|safe }};
+    const ctxScatter = document.getElementById('scatterChart').getContext('2d');
+    const scatterChart = new Chart(ctxScatter, {
+        type: 'scatter',
+        data: {
+            datasets: scatterData.map((d, i) => ({
+                label: d.label.charAt(0).toUpperCase() + d.label.slice(1),
+                data: d.data.map(xy => ({x: xy[0], y: xy[1]})),
+                backgroundColor: ['#00b894', '#fdcb6e', '#e17055'][i],
+                pointRadius: 6,
+                pointHoverRadius: 9
+            }))
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { display: true, position: 'bottom' },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => `${ctx.dataset.label}: (x=${ctx.parsed.x}, y=${ctx.parsed.y})`
+                    }
+                },
+                title: { display: true, text: 'Scatter Plot (Dummy)' }
+            },
+            scales: {
+                x: { title: { display: true, text: 'Fitur X' } },
+                y: { title: { display: true, text: 'Fitur Y' } }
+            }
+        }
+    });
+    // Download chart as PNG
+    function downloadChart(canvasId, filename) {
+        const link = document.createElement('a');
+        link.download = filename;
+        link.href = document.getElementById(canvasId).toDataURL('image/png');
+        link.click();
+    }
+    // Tambahkan plugin zoom ke semua chart
+    [barChart, pieChart, lineChart, modelChart, scatterChart].forEach(function(chart) {
+        if(chart) {
+            chart.options.plugins.zoom = {
+                pan: {
+                    enabled: true,
+                    mode: 'xy',
+                    modifierKey: 'ctrl',
+                },
+                zoom: {
+                    wheel: {
+                        enabled: true,
+                    },
+                    pinch: {
+                        enabled: true
+                    },
+                    mode: 'xy',
+                }
+            };
+            chart.update();
+        }
+    });
+    // Untuk confusion matrix dan heatmap (matrix chart)
+    [
+        document.getElementById('cmChart'),
+        document.getElementById('heatmapChart')
+    ].forEach(function(canvas) {
+        if(canvas && canvas.chart) {
+            canvas.chart.options.plugins.zoom = {
+                pan: { enabled: true, mode: 'xy', modifierKey: 'ctrl' },
+                zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy' }
+            };
+            canvas.chart.update();
+        }
+    });
+</script>
+</body>
+</html>

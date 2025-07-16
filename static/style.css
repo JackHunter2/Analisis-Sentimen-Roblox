@@ -1,0 +1,63 @@
+body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    margin: 0;
+    background-color: #f8f8f8;
+    color: #333;
+    min-height: 100vh;
+}
+h1, h4 {
+    color: #2c3e50;
+    font-weight: 700;
+}
+a {
+    color: #2980b9;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+a:hover {
+    text-decoration: underline;
+    color: #0056b3;
+}
+.card {
+    border-radius: 1rem;
+    border: none;
+    transition: box-shadow 0.3s, transform 0.2s;
+    box-shadow: 0 2px 8px rgba(44,62,80,0.07);
+}
+.card:hover {
+    box-shadow: 0 8px 32px rgba(44,62,80,0.18);
+    transform: translateY(-6px) scale(1.02);
+}
+.btn, .btn-outline-light {
+    border-radius: 2rem;
+    font-weight: 500;
+    transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+    box-shadow: 0 2px 8px rgba(44,62,80,0.07);
+}
+.btn:hover, .btn-outline-light:hover {
+    box-shadow: 0 4px 16px rgba(44,62,80,0.13);
+    filter: brightness(0.95);
+}
+.navbar {
+    border-radius: 0 0 1rem 1rem;
+    box-shadow: 0 2px 12px rgba(44,62,80,0.10);
+}
+.table {
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+.fade-in {
+    animation: fadeIn 0.8s;
+}
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+::-webkit-scrollbar {
+    width: 8px;
+    background: #f8f8f8;
+}
+::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 4px;
+}
