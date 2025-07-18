@@ -28,10 +28,18 @@
     </div>
     <div class="row">
     {% for sentiment, path in clouds.items() %}
+        {% set badge_map = {
+            'positif': ('bg-success', 'Positif'),
+            'negatif': ('bg-danger', 'Negatif'),
+            'netral': ('bg-secondary', 'Netral')
+        } %}
+        {% set s_clean = sentiment|lower|trim %}
+        {% set badge = badge_map.get(s_clean, ('bg-secondary', sentiment|capitalize)) %}
         <div class="col-md-4 mb-3">
             <div class="card shadow-sm text-center p-3 fade-in" style="transition:transform 0.2s;cursor:pointer;">
-                <h5 class="card-title">{{ sentiment|capitalize }}
-                    {% if sentiment == 'positive' %}<span class="badge bg-success ms-2">Positif</span>{% elif sentiment == 'negative' %}<span class="badge bg-danger ms-2">Negatif</span>{% else %}<span class="badge bg-secondary ms-2">Netral</span>{% endif %}
+                <h5 class="card-title">
+                    {{ sentiment|capitalize }}
+                    <span class="badge {{ badge[0] }} ms-2">{{ badge[1] }}</span>
                 </h5>
                 <img src="{{ path }}" class="img-fluid rounded mb-2 wordcloud-img" style="max-height:300px;object-fit:contain;transition:transform 0.2s;">
             </div>

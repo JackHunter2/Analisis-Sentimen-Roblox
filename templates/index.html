@@ -31,7 +31,10 @@
             <div class="card text-center shadow-sm">
                 <div class="card-body">
                     <h5 class="card-title">{{ k|capitalize }}
-                        {% if k == 'positive' %}<span class="badge bg-success ms-2">Positif</span>{% elif k == 'negative' %}<span class="badge bg-danger ms-2">Negatif</span>{% else %}<span class="badge bg-secondary ms-2">Netral</span>{% endif %}
+                        {% if k|lower == 'positif' %}<span class="badge bg-success ms-2">Positif</span>
+                        {% elif k|lower == 'negatif' %}<span class="badge bg-danger ms-2">Negatif</span>
+                        {% else %}<span class="badge bg-secondary ms-2">Netral</span>
+                        {% endif %}
                     </h5>
                     <p class="display-5 fw-bold count-up" data-count="{{ v }}">0</p>
                 </div>
