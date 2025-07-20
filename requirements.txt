@@ -6,3 +6,4 @@ wordcloud
 transformers
 torch
 tqdm
+gunicorn
