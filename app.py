@@ -2,8 +2,10 @@ from flask import Flask, render_template, send_file, request
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from wordcloud import WordCloud
+from wordcloud import WordCloud, STOPWORDS
 import os
+from sklearn.metrics import confusion_matrix
+from collections import Counter
 
 app = Flask(__name__)
 DATA_PATH = "data/Hasil_Labelling_Data.csv"
@@ -12,6 +14,25 @@ DATA_PATH = "data/Hasil_Labelling_Data.csv"
 
 df = pd.read_csv(DATA_PATH)
 # Tidak ada proses labeling otomatis, kolom 'Sentiment' dibiarkan apa adanya
+
+cm_labels = ["positive", "neutral", "negative"]
+cm_matrix = {
+    "Naive Bayes": [
+        [25, 7, 0],
+        [13, 28, 1],
+        [7, 6, 6]
+    ],
+    "SVM": [
+        [23, 9, 0],
+        [5, 35, 2],
+        [1, 4, 14]
+    ],
+    "BERT": [
+        [26, 4, 2],
+        [10, 23, 9],
+        [3, 1, 15]
+    ]
+}
 
 @app.route("/")
 def index():
@@ -33,27 +54,9 @@ def visualisasi():
     all_sentiments = df['Sentiment'].unique().tolist()
     model_labels = ["Naive Bayes", "SVM", "BERT"]
     model_metrics = {
-        "Akurasi": [0.63, 0.77, 0.91],
-        "Precision": [0.70, 0.80, 0.92],
-        "Recall": [0.59, 0.76, 0.90]
-    }
-    cm_labels = ["positive", "neutral", "negative"]
-    cm_matrix = {
-        "Naive Bayes": [
-            [25, 7, 0],
-            [13, 28, 1],
-            [ 7, 6, 6]
-        ],
-        "SVM": [
-            [55, 3, 1],
-            [2, 42, 6],
-            [0, 2, 48]
-        ],
-        "BERT": [
-            [60, 2, 0],
-            [1, 45, 4],
-            [0, 1, 52]
-        ]
+        "Akurasi": [0.63, 0.77, 0.67],
+        "Precision": [0.70, 0.80, 0.59],
+        "Recall": [0.59, 0.76, 0.60]
     }
     return render_template(
         "visualisasi.html",
@@ -69,14 +72,25 @@ def visualisasi():
 @app.route("/wordcloud")
 def wordcloud():
     sentiment_clouds = {}
+    # Pastikan label sentimen konsisten dengan data (Negatif, Netral, Positif)
     for sentiment in df["Sentiment"].unique():
-        # Ganti 'clean_comment' menjadi 'text'
-        text = " ".join(df[df["Sentiment"] == sentiment]["Review Text"].fillna("").astype(str))
-        wc = WordCloud(width=800, height=400, background_color="white").generate(text)
+        # Ambil teks dari kolom 'steming_data' sesuai sentimen
+        text = df[df["Sentiment"] == sentiment]["steming_data"].fillna("").astype(str).str.cat(sep=" ")
+        wc = WordCloud(width=800, height=400, random_state=42, max_font_size=100, background_color="black").generate(text)
         path = f"static/wordcloud_{sentiment}.png"
         wc.to_file(path)
         sentiment_clouds[sentiment] = path
-    return render_template("wordcloud.html", clouds=sentiment_clouds)
+
+    # Hitung frekuensi kata untuk seluruh data
+    text_all = " ".join(df["steming_data"].fillna("").astype(str))
+    stopwords = set(STOPWORDS)
+    stopwords.update(['https', 'yang', 'di', '...', 'dan', 'ya', 'ini', 'nya', 'buat', 'pas'])
+    tokens = [word for word in text_all.split() if word not in stopwords]
+    word_counts = Counter(tokens)
+    top_words = word_counts.most_common(10)
+    words, counts = zip(*top_words) if top_words else ([], [])
+
+    return render_template("wordcloud.html", clouds=sentiment_clouds, freq_words=words, freq_counts=counts)
 
 @app.route("/data")
 def data():
@@ -91,6 +105,27 @@ def download_csv():
 @app.route("/tentang")
 def tentang():
     return render_template("tentang.html")
+
+@app.route("/confusion_matrix/<model>")
+def confusion_matrix_img(model):
+    # Data dummy, ganti dengan data asli jika ada
+    if model not in cm_matrix:
+        return "Model tidak ditemukan", 404
+    cm = cm_matrix[model]
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    plt.figure(figsize=(5, 5))
+    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
+                xticklabels=cm_labels, yticklabels=cm_labels)
+    plt.title(f"Confusion Matrix {model}")
+    plt.xlabel("Predicted Label")
+    plt.ylabel("True Label")
+    plt.tight_layout()
+    img_path = f"static/cm_{model}.png"
+    plt.savefig(img_path)
+    plt.close()
+    from flask import send_file
+    return send_file(img_path, mimetype='image/png')
 
 if __name__ == "__main__":
     app.run(debug=True)
