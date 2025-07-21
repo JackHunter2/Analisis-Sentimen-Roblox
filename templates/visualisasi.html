@@ -131,6 +131,27 @@
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <span class="fw-bold">Confusion Matrix</span>
                 </div>
+                <div class="mb-3">
+                  <label for="cmModelSelectImg" class="form-label">Pilih Model:</label>
+                  <select id="cmModelSelectImg" class="form-select" style="width:auto;display:inline-block;">
+                    <option value="Naive Bayes">Naive Bayes</option>
+                    <option value="SVM">SVM</option>
+                    <option value="BERT">BERT</option>
+                  </select>
+                </div>
+                <div class="text-center">
+                  <img id="cmImg" src="/confusion_matrix/Naive%20Bayes" alt="Confusion Matrix" class="img-fluid" style="max-width:400px;max-height:400px;border-radius:1rem;box-shadow:0 2px 12px rgba(44,62,80,0.10);">
+                </div>
+            </div>
+        </div>
+    </div>
+    <!--
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card p-4 shadow-sm animate__animated animate__fadeInUp">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="fw-bold">Confusion Matrix</span>
+                </div>
                 <select id="cmModelSelect" class="form-select mb-3" style="width:auto;display:inline-block;">
                   {% for model in cm_matrix.keys() %}
                     <option value="{{ model }}">{{ model }}</option>
@@ -140,6 +161,7 @@
             </div>
         </div>
     </div>
+    -->
     <div class="alert alert-info fade-in mb-3" style="font-size:1.05rem">
         <b>Insight:</b>
         {% set max_sent = chart_data['values']|max %}
@@ -254,81 +276,12 @@
             }
         }
     });
-    // Confusion Matrix Chart
-    const cmDict = {{ cm_matrix|tojson|safe }};
-    const cmLabels = {{ cm_labels|tojson|safe }};
-    let currentModel = Object.keys(cmDict)[0];
-    // Fungsi untuk update chart sesuai model
-    function updateCMChart(model) {
-        const cmMatrix = cmDict[model];
-        const cmData = [];
-        const cmMax = Math.max(...cmMatrix.flat());
-        function getCMColor(val, max) {
-            const alpha = 0.2 + 0.8 * (val / max);
-            return `rgba(44,62,80,${alpha})`;
-        }
-        for(let row=0; row<cmLabels.length; row++) {
-            for(let col=0; col<cmLabels.length; col++) {
-                cmData.push({
-                    x: col,
-                    y: row,
-                    v: cmMatrix[row][col],
-                    backgroundColor: getCMColor(cmMatrix[row][col], cmMax)
-                });
-            }
-        }
-        new Chart(document.getElementById('cmChart').getContext('2d'), {
-            type: 'matrix',
-            data: {
-                datasets: [{
-                    label: 'Confusion Matrix',
-                    data: cmData,
-                    width: ({chart}) => (chart.chartArea || {}).width / cmLabels.length - 8,
-                    height: ({chart}) => (chart.chartArea || {}).height / cmLabels.length - 8,
-                    backgroundColor: ctx => ctx.raw.backgroundColor,
-                    borderWidth: 1,
-                    borderColor: '#fff',
-                    hoverBackgroundColor: '#0984e3',
-                    hoverBorderColor: '#636e72',
-                }]
-            },
-            options: {
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            title: ctx => `Asli: ${cmLabels[ctx[0].raw.y]}, Prediksi: ${cmLabels[ctx[0].raw.x]}`,
-                            label: ctx => `Jumlah: ${ctx.raw.v}`
-                        }
-                    },
-                    title: { display: true, text: 'Confusion Matrix (Dummy)' }
-                },
-                scales: {
-                    x: {
-                        type: 'category',
-                        labels: cmLabels,
-                        title: { display: true, text: 'Prediksi', font: { weight: 'bold' } },
-                        offset: true,
-                        grid: { display: false }
-                    },
-                    y: {
-                        type: 'category',
-                        labels: cmLabels,
-                        title: { display: true, text: 'Label Asli', font: { weight: 'bold' } },
-                        offset: true,
-                        reverse: true,
-                        grid: { display: false }
-                    }
-                }
-            }
-        });
-    }
-    document.getElementById('cmModelSelect').addEventListener('change', function() {
-        currentModel = this.value;
-        updateCMChart(currentModel);
+    // Confusion Matrix Chart (gambar PNG)
+    document.getElementById('cmModelSelectImg').addEventListener('change', function() {
+        const model = this.value;
+        let url = '/confusion_matrix/' + encodeURIComponent(model);
+        document.getElementById('cmImg').src = url;
     });
-    // Panggil pertama kali
-    updateCMChart(currentModel);
     // Download chart as PNG
     function downloadChart(canvasId, filename) {
         const link = document.createElement('a');
